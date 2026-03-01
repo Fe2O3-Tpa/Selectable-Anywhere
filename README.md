@@ -156,7 +156,7 @@ GM_setValue / GM_getValue
 
 ## 📄 ライセンス
 
-MIT License（予定）
+MIT License
 
 ---
 
