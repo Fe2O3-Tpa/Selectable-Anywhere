@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Copy Test</title>
+<style>
+  .no-select { user-select: none; }
+  .selectable { user-select: text; }
+</style>
+</head>
+<body>
+
+<h2>通常テキスト</h2>
+<p class="selectable">これはコピー可能なテキストです。</p>
+
+<h2>制限テキスト (user-select:none)</h2>
+<p class="no-select">これは本来コピーできないテキストです。</p>
+
+<h2>フォーム要素（除外対象）</h2>
+<input type="text" value="入力ボックス" />
+<textarea>テキストエリア</textarea>
+<div contenteditable="true">contenteditableエリア</div>
+
+</body>
+</html>
