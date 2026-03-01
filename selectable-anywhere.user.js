@@ -53,23 +53,6 @@
   let observer = null;
   let debounceTimer = null;
   const pendingNodes = new Set();
-  // Debug counters for hypotheses except self-trigger loop:
-  // - restore-condition thrash
-  // - SPA/high-DOM-update correlation
-  // - initial scan limit coverage
-  const debugStats = {
-    cycleStartedAt: 0,
-    mutationsAttr: 0,
-    mutationsChildList: 0,
-    mutationBatches: 0,
-    processedFromFlush: 0,
-    forcedCount: 0,
-    restoredCount: 0,
-    restoredWhileEnabled: 0,
-    observedNone: 0,
-    scanTotalElements: 0,
-    scanProcessedElements: 0,
-  };
 
   function log(message) {
     if (!DEBUG) return;
@@ -148,7 +131,6 @@
     if (!isEligible(el)) return;
     saveInlineValueIfNeeded(el);
     el.style.setProperty("user-select", "text", "important");
-    debugStats.forcedCount += 1;
   }
 
   function restoreInlineUserSelect(el) {
@@ -162,12 +144,6 @@
     }
 
     savedInlineUserSelect.delete(el);
-    debugStats.restoredCount += 1;
-    // Hypothesis #2: restore-condition may be too aggressive while enabled.
-    if (state.enabled) {
-      debugStats.restoredWhileEnabled += 1;
-      log("restore happened while enabled");
-    }
   }
 
   function processElement(el) {
@@ -180,7 +156,6 @@
 
     const computed = getComputedUserSelect(el);
     if (computed === "none") {
-      debugStats.observedNone += 1;
       forceUserSelectText(el);
       return;
     }
@@ -206,13 +181,8 @@
 
     for (const root of nodes) {
       processElement(root);
-      debugStats.processedFromFlush += 1;
     }
     compactTrackedRefs();
-    // Hypothesis #3: mutation volume and instability may correlate.
-    log(
-      `flush summary: roots=${nodes.length}, processed=${debugStats.processedFromFlush}, attrMut=${debugStats.mutationsAttr}, childMut=${debugStats.mutationsChildList}`
-    );
   }
 
   function scheduleFlush() {
@@ -225,15 +195,12 @@
     if (!state.enabled) return;
 
     observer = new MutationObserver((mutations) => {
-      debugStats.mutationBatches += 1;
       for (const m of mutations) {
         if (m.type === "attributes") {
-          debugStats.mutationsAttr += 1;
           enqueueSubtree(m.target);
           continue;
         }
         if (m.type === "childList") {
-          debugStats.mutationsChildList += 1;
           for (let i = 0; i < m.addedNodes.length; i += 1) {
             enqueueSubtree(m.addedNodes[i]);
           }
@@ -265,17 +232,9 @@
 
     processElement(document.documentElement);
     const all = document.querySelectorAll("*");
-    debugStats.scanTotalElements = all.length;
     const limit = Math.min(all.length, INITIAL_SCAN_LIMIT);
-    debugStats.scanProcessedElements = limit;
     for (let i = 0; i < limit; i += 1) {
       processElement(all[i]);
-    }
-    // Hypothesis #4: initial scan limit may leave uncovered areas.
-    if (all.length > limit) {
-      log(`initial scan capped: processed=${limit}, total=${all.length}`);
-    } else {
-      log(`initial scan full: processed=${limit}`);
     }
   }
 
@@ -284,10 +243,8 @@
   // 2) 変更前インライン値を保存
   // 3) user-select: text !important を付与
   function applySelectablePolicyOnEnable() {
-    debugStats.cycleStartedAt = Date.now();
     scanWholeDocument();
     startObserver();
-    log(`enable cycle started: trackedRefs=${trackedRefs.length}`);
   }
 
   // ===== ロジック処理位置（OFF時） =====
@@ -295,9 +252,6 @@
   function restoreSelectablePolicyOnDisable() {
     stopObserver();
     forEachTrackedElement((el) => restoreInlineUserSelect(el));
-    log(
-      `disable summary: forced=${debugStats.forcedCount}, restored=${debugStats.restoredCount}, restoredWhileEnabled=${debugStats.restoredWhileEnabled}, observedNone=${debugStats.observedNone}, mutationBatches=${debugStats.mutationBatches}, attrMut=${debugStats.mutationsAttr}, childMut=${debugStats.mutationsChildList}, scan=${debugStats.scanProcessedElements}/${debugStats.scanTotalElements}, trackedRefs=${trackedRefs.length}, uptimeMs=${Date.now() - debugStats.cycleStartedAt}`
-    );
   }
 
   function reevaluateAll() {
@@ -306,7 +260,6 @@
     } else {
       restoreSelectablePolicyOnDisable();
     }
-    log(state.enabled);
   }
 
   function applyUiStyle(el) {
