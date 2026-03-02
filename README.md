@@ -102,20 +102,19 @@ GM_setValue / GM_getValue
 
 ### 対象イベント
 
-- copy
-- cut
-- contextmenu
-- selectstart
+- UIトグルの `click`（ON/OFF切替）
+- `DOMContentLoaded`（UIマウントの遅延実行）
 
 ### CSS戦略
 
 - `user-select` のみ上書き
-- `input / textarea / button` は除外
+- `input / textarea / button / select / option / canvas / svg / video / audio / contenteditable / [data-sa-ui]` は除外
 - pointer-events は変更しない
 
 ### MutationObserver
 
-- `style` 属性変更のみ監視
+- `style` 属性変更を監視
+- `childList`（追加ノード）を監視
 - subtree: true
 
 ---
@@ -140,9 +139,9 @@ GM_setValue / GM_getValue
 
 ## 🔮 今後の拡張予定
 
-- UIドラッグ移動機能
 - Shadow DOM対応版
 - iframe対応版
+- JavaScriptで制限されているサイトに対応
 
 ---
 
