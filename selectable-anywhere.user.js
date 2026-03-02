@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Selectable Anywhere
-// @namespace    https://tampermonkey.net/
-// @version      1.5.3
+// @namespace    https://qiita.com/Prrapp
+// @version      2.0.1
 // @description  Safe-first selectable/copy unlocker (minimal interference)
 // @match        *://*/*
 // @run-at       document-start
@@ -49,10 +49,14 @@
   const trackedRefs = [];
   const TRACKED_REFS_COMPACT_THRESHOLD = 2000;
   const INITIAL_SCAN_LIMIT = 1500;
+  const OBSERVER_DEBOUNCE_MS = 50;
+  const OBSERVER_ATTRIBUTE_FILTER = ["style"];
 
   let observer = null;
   let debounceTimer = null;
   const pendingNodes = new Set();
+  const EVENT_NAMES = ["selectstart", "mousedown", "pointerdown", "contextmenu", "copy"];
+  const eventHandlers = new Map();
 
   function log(message) {
     if (!DEBUG) return;
@@ -187,7 +191,7 @@
 
   function scheduleFlush() {
     if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(flushPending, 50);
+    debounceTimer = setTimeout(flushPending, OBSERVER_DEBOUNCE_MS);
   }
 
   function startObserver() {
@@ -213,7 +217,7 @@
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["style"],
+      attributeFilter: OBSERVER_ATTRIBUTE_FILTER,
     });
   }
 
@@ -238,11 +242,67 @@
     }
   }
 
+  function createEventHandler(eventName) {
+    return function onBlockedEvent(event) {
+      if (!state.enabled) return;
+      event.stopImmediatePropagation();
+      log(`blocked event: ${eventName}`);
+    };
+  }
+
+  function createEventHandlerMap(target, eventNames) {
+    const handlers = new Map();
+    if (!target || !eventNames || !eventNames.length) return handlers;
+
+    for (const eventName of eventNames) {
+      const handler = createEventHandler(eventName);
+      handlers.set(eventName, new Set([handler]));
+    }
+
+    return handlers;
+  }
+
+  function forEachEventHandler(handlers, visitor) {
+    for (const [eventName, set] of handlers) {
+      for (const handler of set) {
+        visitor(eventName, handler);
+      }
+    }
+  }
+
+  function registerEventHandlers(target, handlers) {
+    if (!target || !handlers || handlers.size === 0) return;
+    forEachEventHandler(handlers, (eventName, handler) => {
+      target.addEventListener(eventName, handler, true);
+    });
+  }
+
+  function unregisterEventHandlers(target, handlers) {
+    if (!target || !handlers || handlers.size === 0) return;
+    forEachEventHandler(handlers, (eventName, handler) => {
+      target.removeEventListener(eventName, handler, true);
+    });
+    for (const [, set] of handlers) {
+      set.clear();
+    }
+    handlers.clear();
+  }
+
+  function ensureEventHandlersInitialized(target) {
+    if (eventHandlers.size > 0) return;
+    const created = createEventHandlerMap(target, EVENT_NAMES);
+    for (const [eventName, set] of created) {
+      eventHandlers.set(eventName, set);
+    }
+  }
+
   // ===== ロジック処理位置（ON時） =====
   // 1) 計算後スタイルが none の要素のみ対象化
   // 2) 変更前インライン値を保存
   // 3) user-select: text !important を付与
   function applySelectablePolicyOnEnable() {
+    ensureEventHandlersInitialized(document);
+    registerEventHandlers(document, eventHandlers);
     scanWholeDocument();
     startObserver();
   }
@@ -251,6 +311,7 @@
   // 保存済みの変更前インライン値へ復元（none 固定で戻さない）
   function restoreSelectablePolicyOnDisable() {
     stopObserver();
+    unregisterEventHandlers(document, eventHandlers);
     forEachTrackedElement((el) => restoreInlineUserSelect(el));
   }
 

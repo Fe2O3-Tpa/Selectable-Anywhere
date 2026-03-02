@@ -47,12 +47,14 @@ prototype の改変など副作用の大きい手法は使用せず、
 
 ### 🔴 無効状態（赤・×表示）
 
-- スクリプトは何もしません
+- 制限解除処理（スタイル上書き・イベント遮断）は停止します
+- UI表示と状態保存機能は動作します
 
 ### 🔁 切替方法
 
 - 画面右下の丸いボタンをクリック
-- 状態が保存され、自動でページが再読み込みされます
+- 状態が保存され、その場で即時反映されます
+- Shift+クリックでUIを折りたたみ/展開できます
 
 ---
 
@@ -74,7 +76,7 @@ prototype の改変など副作用の大きい手法は使用せず、
 
 - ❌ EventTarget.prototype の改変
 - ❌ addEventListener の上書き
-- ❌ pointer-events の変更
+- ❌ サイト本体要素の pointer-events 変更
 - ❌ Shadow DOM 内部干渉
 - ❌ iframe 内部干渉
 
@@ -102,20 +104,28 @@ GM_setValue / GM_getValue
 
 ### 対象イベント
 
-- UIトグルの `click`（ON/OFF切替）
-- `DOMContentLoaded`（UIマウントの遅延実行）
+- 制限解除用:
+  - `selectstart`
+  - `mousedown`
+  - `pointerdown`
+  - `contextmenu`
+  - `copy`
+- UI/初期化用:
+  - UIトグルの `click`（ON/OFF切替）
+  - `DOMContentLoaded`（UIマウントの遅延実行）
 
 ### CSS戦略
 
 - `user-select` のみ上書き
 - `input / textarea / button / select / option / canvas / svg / video / audio / contenteditable / [data-sa-ui]` は除外
-- pointer-events は変更しない
+- サイト本体要素の `pointer-events` は変更しない（UI要素のみ `pointer-events: auto` を使用）
 
 ### MutationObserver
 
 - `style` 属性変更を監視
 - `childList`（追加ノード）を監視
-- subtree: true
+- `subtree: true`
+- 50msデバウンスで再評価
 
 ---
 
@@ -131,9 +141,8 @@ GM_setValue / GM_getValue
 
 ## 🧪 動作確認環境
 
-- Chrome 最新版
-- Edge 最新版
-- Tampermonkey 最新版
+- Vivaldi 最新版
+- Tampermonkey 5.4.1
 
 ---
 
